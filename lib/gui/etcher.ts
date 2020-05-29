@@ -56,6 +56,11 @@ async function checkForUpdates(interval: number) {
 
 let openImageURL: string = process.argv.slice(1)[0] || '';
 
+// Take into account electron exec path argument for dev. env.
+if (!electron.app.isPackaged) {
+	openImageURL = process.argv.slice(2)[0] || '';
+}
+
 // This will catch clicks on links such as <a href="etcher://...">Open in Etcher</a>
 // We need to listen to the event before everything else otherwise the event won't be fired
 electron.app.on('open-url', async (event, data) => {
@@ -63,7 +68,7 @@ electron.app.on('open-url', async (event, data) => {
 	openImageURL = data;
 	electron.BrowserWindow.getAllWindows().forEach((window) =>
 		window.webContents.send(
-			'select-image-url',
+			'select-image',
 			openImageURL.replace('etcher://', ''),
 		),
 	);
@@ -125,8 +130,8 @@ async function createMainWindow() {
 	const page = mainWindow.webContents;
 
 	page.once('did-frame-finish-load', async () => {
-		if (_.startsWith(openImageURL, 'etcher://')) {
-			page.send('select-image-url', openImageURL.replace('etcher://', ''));
+		if (openImageURL) {
+			page.send('select-image', openImageURL.replace('etcher://', ''));
 		}
 		autoUpdater.on('error', (err) => {
 			analytics.logException(err);
@@ -178,15 +183,18 @@ async function main(): Promise<void> {
 	} else {
 		electron.app.on('second-instance', (_event, argv, _cwd) => {
 			openImageURL = argv.slice(1)[0] || '';
+			if (openImageURL === '.') {
+				openImageURL = argv.slice(2)[0] || '';
+			}
 			if (window) {
 				if (window.isMinimized()) {
 					window.restore();
 				}
 				window.focus();
 			}
-			if (_.startsWith(openImageURL, 'etcher://')) {
+			if (openImageURL) {
 				window.webContents.send(
-					'select-image-url',
+					'select-image',
 					openImageURL.replace('etcher://', ''),
 				);
 			}
